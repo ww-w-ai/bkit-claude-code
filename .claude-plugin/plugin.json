@@ -4,11 +4,11 @@
   "displayName": "bkit — AI Native Development OS",
   "description": "A Claude Code plugin that verifies AI-generated code against its own design specs.",
   "author": {
-    "name": "POPUP STUDIO PTE. LTD.",
-    "email": "contact@popupstudio.ai",
-    "url": "https://popupstudio.ai"
+    "name": "DubDubDub Corp.",
+    "email": "contact@ww-w.ai",
+    "url": "https://ww-w.ai"
   },
-  "repository": "https://github.com/popup-studio-ai/bkit-claude-code",
+  "repository": "https://github.com/ww-w-ai/bkit-claude-code",
   "license": "Apache-2.0",
   "keywords": [
     "pdca", "development-automation", "agent-teams", "quality-gates",

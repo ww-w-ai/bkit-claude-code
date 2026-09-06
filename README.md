@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-v2.1.143+-purple.svg)](https://code.claude.com)
 [![Version](https://img.shields.io/badge/Version-2.1.38-green.svg)](CHANGELOG.md)
-[![Author](https://img.shields.io/badge/Author-POPUP%20STUDIO-orange.svg)](https://popupstudio.ai)
+[![Author](https://img.shields.io/badge/Author-DubDubDub-orange.svg)](https://ww-w.ai)
 
 > **Requirement**: bkit requires Claude Code **v2.1.143 or later** (the strict plugin-manifest path recognizes the official `displayName` field only from v2.1.143). On older Claude Code you will see `Validation errors: Unrecognized key: "displayName"` during `claude plugin install`. Run `npm install -g @anthropic-ai/claude-code@latest` to upgrade, or see [`docs/06-guide/cc-compatibility.guide.md`](docs/06-guide/cc-compatibility.guide.md).
 
@@ -246,7 +246,7 @@ have been absorbed directly into bkit's regression test suite
 
 ### v2.1.20 (2026-05-26 — second entry, first-follower effect validated)
 
-- **[@bj (정병진)](https://github.com/popup-studio-ai/bkit-claude-code/issues)** —
+- **[@bj (정병진)](https://github.com/ww-w-ai/bkit-claude-code/issues)** —
   bkit v2.1.14 install incident (2026-05-26, `Validation errors: : Unrecognized
   key: "displayName"`). Precise error message + cache path + Cursor IDE
   environment metadata sharing drove the entire **v2.1.20 Marketplace
@@ -261,7 +261,7 @@ have been absorbed directly into bkit's regression test suite
 
 ### v2.1.36 (2026-08-12 — third entry)
 
-- **[@Sinclair-Seo](https://github.com/popup-studio-ai/bkit-claude-code/issues/148)**
+- **[@Sinclair-Seo](https://github.com/ww-w-ai/bkit-claude-code/issues/148)**
   — issue #148. Three Destructive Detector rules were refusing commands that are
   read-only or narrowly scoped. The report came with a 12-case reproduction
   harness that included **negative controls**, and the note that makes them
@@ -302,7 +302,7 @@ Established **v2.1.19** (master plan §15.4 DA-1~DA-4, ENH-318 차별화 7/7).
   reproduction-script-first response
 
 **How to join**: file your first detailed issue at
-[bkit-claude-code/issues](https://github.com/popup-studio-ai/bkit-claude-code/issues)
+[bkit-claude-code/issues](https://github.com/ww-w-ai/bkit-claude-code/issues)
 with bkit version, reproduction steps, expected vs actual behavior,
 and file:line references. See
 [`docs/external-dogfooders/_README.md`](docs/external-dogfooders/_README.md)
@@ -316,4 +316,4 @@ for the full 5-stage User-Feedback Lifecycle and program structure.
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE). POPUP STUDIO PTE. LTD. · `kay@popupstudio.ai`
+Apache 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE). DubDubDub Corp. · `contact@ww-w.ai`
