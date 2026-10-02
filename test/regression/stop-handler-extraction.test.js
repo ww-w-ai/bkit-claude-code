@@ -161,7 +161,18 @@ HANDLERS.forEach((rel, i) => {
 HANDLERS.forEach((rel, i) => {
   const src = read(rel);
   const n = String(i + 26).padStart(3, '0');
-  assert(`SE-${n}`, /if \(require\.main !== module\) \{ module\.exports = \{\}; return; \}/.test(src),
+  /*
+   * SE-026 amendment (fix-br-report-strand-wave): gap-detector-stop.js no
+   * longer uses the literal `{ module.exports = {}; return; }` form. Since
+   * bugfix-wave-20260919 §3 Fix 4 (d2f5fa5) it exports its PURE HELPERS on
+   * the require path (`module.exports = { parseMatchRate, ... }`) and runs
+   * the hook body in an else-branch — that is why test/unit/
+   * gap-detector-stop-parsing.test.js can require it at all. The guard's
+   * contract is "require() must not execute the hook body", and both forms
+   * satisfy it; what the regression must never let drift away is the
+   * `require.main !== module` fork itself.
+   */
+  assert(`SE-${n}`, /if \(require\.main !== module\)/.test(src),
     `${path.basename(rel)} keeps its bare-require guard`);
 });
 

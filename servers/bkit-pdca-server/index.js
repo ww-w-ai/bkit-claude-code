@@ -144,7 +144,14 @@ function errResponse(code, message, details) {
 const TOOLS = [
   {
     name: 'bkit_pdca_status',
-    description: 'Read current PDCA status. Optionally filter by feature name for detail.',
+    // registry-lockdown: this tool is the SANCTIONED read surface for PDCA
+    // phase state — agents read state here rather than opening the registry
+    // file (writes are broker-only: skill fires + the archive CLI).
+    // Field report 2026-09-08: an agent given a `/pdca plan` prompt called
+    // THIS tool instead of firing the skill, then waited on a registry that
+    // could never move — MCP is read-only by design. The description now
+    // teaches the write path so a confused agent self-routes to the fire.
+    description: 'Read current PDCA status (the sanctioned read surface — prefer this over opening the registry file). READ-ONLY: this tool cannot advance phases or write state; to advance a phase or archive, invoke the bkit:pdca skill (/pdca <phase> <feature>). Optionally filter by feature name for detail.',
     inputSchema: {
       type: 'object',
       properties: {

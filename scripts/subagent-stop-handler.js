@@ -125,6 +125,17 @@ function main() {
   } catch (_e) { /* fail-silent */ }
 
   const response = {
+    /*
+     * registry-lockdown follow-up (field report 2026-09-08): the next-action
+     * hint stays on the systemMessage (orchestrator/user surface) ONLY.
+     * It used to also ride additionalContext, which CC injects into the
+     * STOPPING SUBAGENT's own context — and no PDCA subagent has the Skill
+     * tool (gap-detector is Read/Glob/Grep/Explore), so "Next: /pdca …" was
+     * un-actionable where it landed. The gap-detector in the field declined
+     * the identical suggestion six times across six stop→re-prompt cycles.
+     * The orchestrator, which CAN fire skills, still sees the hint once per
+     * subagent stop via systemMessage.
+     */
     systemMessage: `Subagent ${agentName} stopped (${status})${nextActionHint ? '\n' + nextActionHint : ''}`,
     hookSpecificOutput: {
       hookEventName: "SubagentStop",
@@ -132,7 +143,6 @@ function main() {
       agentName,
       agentType,
       status,
-      ...(nextActionHint ? { additionalContext: nextActionHint } : {}),
     }
   };
 

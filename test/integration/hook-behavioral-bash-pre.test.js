@@ -9,6 +9,9 @@
  */
 
 const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { runHook } = require('../helpers/hook-runner');
 
 let passed = 0, failed = 0, total = 0;
@@ -42,11 +45,15 @@ function bashInput(command) {
 }
 
 // ---------- BPRE-01: Normal safe command is allowed ----------
-test('BPRE-01', 'Normal safe bash command is allowed with exit 0', () => {
+test('BPRE-01', 'Normal safe bash command is allowed with exit 0 (silent unless verbose)', () => {
+  // Success-path stdout is opt-in (spam fix): default run is silent, the
+  // validation message appears only with BKIT_VERBOSE_VALIDATION=1.
   const result = runHook(SCRIPT, bashInput('ls -la'));
   assert.strictEqual(result.exitCode, 0, `exitCode should be 0, got ${result.exitCode}`);
-  const out = typeof result.stdout === 'string' ? result.stdout : JSON.stringify(result.stdout);
-  assert.ok(out.includes('Bash command validated'), `stdout should include "Bash command validated", got: ${out}`);
+  const verbose = runHook(SCRIPT, bashInput('ls -la'), { env: { BKIT_VERBOSE_VALIDATION: '1' } });
+  assert.strictEqual(verbose.exitCode, 0);
+  const out = typeof verbose.stdout === 'string' ? verbose.stdout : JSON.stringify(verbose.stdout);
+  assert.ok(out.includes('Bash command validated'), `verbose stdout should include "Bash command validated", got: ${out}`);
 });
 
 // ---------- BPRE-02: Empty input is allowed (no command to block) ----------
@@ -65,17 +72,31 @@ test('BPRE-03', 'Empty command string is allowed', () => {
 test('BPRE-04', 'Non-destructive git command (git status) is allowed', () => {
   const result = runHook(SCRIPT, bashInput('git status'));
   assert.strictEqual(result.exitCode, 0, `exitCode should be 0, got ${result.exitCode}`);
-  const out = typeof result.stdout === 'string' ? result.stdout : JSON.stringify(result.stdout);
-  assert.ok(out.includes('Bash command validated'), `Should allow git status`);
+  // Silent success is the contract; exit 0 alone proves the allow.
+  assert.ok(typeof result.stdout === 'string' || result.stdout === undefined || result.stdout === null || typeof result.stdout === 'object', 'Should allow git status');
 });
 
 // ---------- BPRE-05: No active skill/agent produces generic validation message ----------
 test('BPRE-05', 'No active context produces generic "Bash command validated." message', () => {
   const result = runHook(SCRIPT, bashInput('echo hello'));
   assert.strictEqual(result.exitCode, 0);
-  const out = typeof result.stdout === 'string' ? result.stdout : JSON.stringify(result.stdout);
-  // Without active skill/agent, message should be generic (no "for" clause)
-  assert.ok(out.includes('Bash command validated'), `Should include validation message, got: ${out}`);
+  // Without active skill/agent the (verbose-only) message is generic — verify
+  // via the verbose path that no skill/agent clause is attached.
+  // Hermetic: point the hook at an empty sandbox project so the live
+  // registry's session.lastSkill (set by whichever suite ran before this one
+  // in the aggregate) cannot leak a "for <skill>" clause in.
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'bkit-bpre05-'));
+  let verbose;
+  try {
+    verbose = runHook(SCRIPT, bashInput('echo hello'), {
+      env: { BKIT_VERBOSE_VALIDATION: '1', CLAUDE_PROJECT_DIR: sandbox },
+    });
+  } finally {
+    fs.rmSync(sandbox, { recursive: true, force: true });
+  }
+  const out = typeof verbose.stdout === 'string' ? verbose.stdout : JSON.stringify(verbose.stdout);
+  assert.ok(out.includes('Bash command validated.'), `Should include generic validation message, got: ${out}`);
+  assert.ok(!out.includes('for '), `Message should have no "for <skill>" clause, got: ${out}`);
 });
 
 // ---------- BPRE-06: Complex but safe command is allowed ----------

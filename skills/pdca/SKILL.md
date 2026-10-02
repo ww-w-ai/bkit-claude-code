@@ -84,7 +84,7 @@ Run PM Agent Team for product discovery and strategy analysis before Plan phase.
    - 8-section PRD generation
 5. Output PRD to `docs/00-pm/{feature}.prd.md`
 6. Create Task: `[PM] {feature}`
-7. Update `.bkit/state/pdca-status.json`: phase = "pm"
+7. **Phase registry (automatic)**: this invocation already wrote `phase = "pm"` to `.bkit/state/pdca-status.json` (skill-fire effect). Verify if needed — never hand-edit the registry
 8. Guide user to next step: `/pdca plan {feature}`
 
 **Output Path**: `docs/00-pm/{feature}.prd.md`
@@ -95,7 +95,7 @@ Run PM Agent Team for product discovery and strategy analysis before Plan phase.
 
 ### plan (Plan Phase)
 
-0. **Template Loading**: Read `templates/plan.template.md` to understand the required Plan document structure and sections. Use this template's sections as your document outline. This is MANDATORY — do not generate Plan documents from memory or assumptions.
+0. **Template Loading**: Read `${CLAUDE_PLUGIN_ROOT}/templates/plan.template.md` to understand the required Plan document structure and sections. Use this template's sections as your document outline. This is MANDATORY — do not generate Plan documents from memory or assumptions.
 1. **PRD Auto-Reference**: Check if `docs/00-pm/{feature}.prd.md` exists
    - If found: Read PRD and use as context for Plan document (improves quality significantly)
    - If not found: Proceed normally (tip: run `/pdca pm {feature}` first for better results)
@@ -106,7 +106,7 @@ Run PM Agent Team for product discovery and strategy analysis before Plan phase.
 6. **Checkpoint 2 — Clarifying Questions**: Identify underspecified elements (edge cases, error handling, integration points, compatibility). Present organized question list. Wait for answers before generating the document.
 7. Generate Plan document with user-confirmed requirements
 8. **Complete predecessor Task first**: If a `[PM] {feature}` Task exists and is still `in_progress`, use TaskList to find it and TaskUpdate it to `status: "completed"` before creating the Plan Task (see [Phase Transition Rule](#task-integration)). Then Create Task: `[Plan] {feature}`
-9. Update `.bkit/state/pdca-status.json`: phase = "plan"
+9. **Phase registry (automatic)**: this invocation already wrote `phase = "plan"` to `.bkit/state/pdca-status.json` (skill-fire effect). Verify if needed — never hand-edit the registry
 10. Write `## Executive Summary` at document top with 4-perspective table (Problem/Solution/Function UX Effect/Core Value), each 1-2 sentences
 11. **Context Anchor Generation**: After generating Plan document, extract Context Anchor (WHY/WHO/RISK/SUCCESS/SCOPE) from Executive Summary, Requirements, and Risk sections. Write as `## Context Anchor` table between Executive Summary and Section 1. This anchor propagates to Design/Do documents for cross-session context continuity.
 12. **MANDATORY**: After completing the document, also output the Executive Summary table in your response so the user sees it immediately without opening the file
@@ -119,7 +119,7 @@ Run PM Agent Team for product discovery and strategy analysis before Plan phase.
 
 ### design (Design Phase)
 
-0. **Template Loading**: Read `templates/design.template.md` to understand the required Design document structure. Use this template's sections as your document outline. This is MANDATORY — do not generate Design documents from memory or assumptions.
+0. **Template Loading**: Read `${CLAUDE_PLUGIN_ROOT}/templates/design.template.md` to understand the required Design document structure. Use this template's sections as your document outline. This is MANDATORY — do not generate Design documents from memory or assumptions.
 1. Verify Plan document exists (required - suggest running plan first if missing)
 2. Read Plan document to understand requirements and scope
 3. **PRD Context Loading**: Check if `docs/00-pm/{feature}.prd.md` exists. If found, read the Executive Summary and Beachhead/GTM sections to inform architecture decisions with market context. This prevents strategic context loss at the Plan→Design handoff.
@@ -138,7 +138,7 @@ Run PM Agent Team for product discovery and strategy analysis before Plan phase.
     - If Design Anchor already exists (`docs/02-design/styles/{feature}.design-anchor.md`), embed it in the Design document as `## Design Anchor` section
     - This ensures design tokens (colors, typography, spacing) are locked before implementation
 12. **Complete predecessor Task first**: Use TaskList to find the `[Plan] {feature}` Task (and any earlier phase Task for this feature still `in_progress`) and TaskUpdate each to `status: "completed"` — this resolves the `blockedBy` chain and prevents stale phase status from leaking into prompt context (see [Phase Transition Rule](#task-integration)). Then Create Task: `[Design] {feature}` (blockedBy: Plan task)
-13. Update `.bkit/state/pdca-status.json`: phase = "design"
+13. **Phase registry (automatic)**: this invocation already wrote `phase = "design"` to `.bkit/state/pdca-status.json` (skill-fire effect). Verify if needed — never hand-edit the registry
 
 **Output Path**: `docs/02-design/features/{feature}.design.md`
 
@@ -168,14 +168,14 @@ Run PM Agent Team for product discovery and strategy analysis before Plan phase.
    - Files to modify: M
    - Estimated changes: ~X lines
 10. **Checkpoint 4 — Implementation Approval**: Present scope summary and use AskUserQuestion: "이 범위로 구현을 시작해도 되겠습니까?" **DO NOT START IMPLEMENTATION WITHOUT USER APPROVAL.**
-11. After approval, provide implementation guide based on `do.template.md`
+11. After approval, provide implementation guide based on `${CLAUDE_PLUGIN_ROOT}/templates/do.template.md`
 12. Reference implementation order from Design document (filtered by --scope if provided)
 13. **Code Comment Convention (Phase 3)**: During implementation, add Design reference comments for key architectural decisions:
     - At module/file level: `// Design Ref: §{section} — {decision rationale}`
     - At critical logic: `// Plan SC: {success criteria being addressed}`
     - These comments create traceable links from code back to design decisions
 14. **Complete predecessor Task first**: Use TaskList to find the `[Design] {feature}` Task (and any earlier phase Task for this feature still `in_progress`) and TaskUpdate each to `status: "completed"` — this resolves the `blockedBy` chain and prevents stale phase status from leaking into prompt context (see [Phase Transition Rule](#task-integration)). Then Create Task: `[Do] {feature}` (blockedBy: Design task)
-15. Update `.bkit/state/pdca-status.json`: phase = "do"
+15. **Phase registry (automatic)**: this invocation already wrote `phase = "do"` to `.bkit/state/pdca-status.json` (skill-fire effect). Verify if needed — never hand-edit the registry
 
 **--scope Parameter**:
 ```
@@ -262,7 +262,7 @@ Run PM Agent Team for product discovery and strategy analysis before Plan phase.
     - "그대로 진행" — accept current state
     Wait for user decision before proceeding.
 12. **Complete predecessor Task first**: Use TaskList to find the `[Do] {feature}` Task (and any earlier phase Task for this feature still `in_progress`) and TaskUpdate each to `status: "completed"` — this resolves the `blockedBy` chain and prevents stale phase status from leaking into prompt context (see [Phase Transition Rule](#task-integration)). Then Create Task: `[Check] {feature}` (blockedBy: Do task)
-13. Update `.bkit/state/pdca-status.json`: phase = "check", matchRate
+13. **Phase registry (automatic)**: `phase = "check"` was written by this invocation; the `matchRate` is recorded by the gap-detector Stop hook when the agent completes. Verify only — never hand-edit the registry
 
 **Output Path**: `docs/03-analysis/{feature}.analysis.md`
 
@@ -282,7 +282,7 @@ Run PM Agent Team for product discovery and strategy analysis before Plan phase.
    - `QA_FAIL` → fall back to `iterate` phase
    - `QA_SKIP` → mark qa as skipped, proceed to `report`
 5. **Complete predecessor Task first**: Use TaskList to find the `[Check] {feature}` Task and the latest `[Act-N] {feature}` Task (and any earlier phase Task for this feature still `in_progress`) and TaskUpdate each to `status: "completed"` (see [Phase Transition Rule](#task-integration)). Then Create Task: `[QA] {feature}`
-6. Update `.bkit/state/pdca-status.json`: phase = "qa", qaStatus = <PASS|FAIL|SKIP>
+6. **Phase registry (automatic)**: `phase = "qa"` was written by this invocation; `qaStatus` (`PASS|FAIL|SKIP`) is recorded by the QA stop handling when the QA flow completes. Verify only — never hand-edit the registry
 
 **Output Path**: `docs/05-qa/{feature}.qa-report.md`
 
@@ -303,7 +303,7 @@ Run PM Agent Team for product discovery and strategy analysis before Plan phase.
 
 ### report (Completion Report)
 
-0. **Template Loading**: Read `templates/report.template.md` to understand the required Report document structure. Use this template's sections as your document outline. This is MANDATORY — do not generate Report documents from memory or assumptions.
+0. **Template Loading**: Read `${CLAUDE_PLUGIN_ROOT}/templates/report.template.md` to understand the required Report document structure. Use this template's sections as your document outline. This is MANDATORY — do not generate Report documents from memory or assumptions.
 1. Verify Check >= 90% (warn if below)
 2. **Full Upstream Context Loading (Phase 2+3)**: Load ALL upstream documents for comprehensive reporting:
    - Read PRD — compare original value proposition vs delivered value
@@ -323,7 +323,7 @@ Run PM Agent Team for product discovery and strategy analysis before Plan phase.
 7. Include `## Executive Summary` with `### 1.3 Value Delivered` reflecting actual results (4 perspectives with metrics)
 8. **MANDATORY**: After completing the report, also output the Executive Summary table in your response
 9. **Complete predecessor Task first**: Use TaskList to find the `[QA] {feature}` Task (or the `[Check] {feature}` / latest `[Act-N] {feature}` Task if QA was skipped) and any earlier phase Task for this feature still `in_progress`, and TaskUpdate each to `status: "completed"` (see [Phase Transition Rule](#task-integration)). Then Create Task: `[Report] {feature}`
-10. Update `.bkit/state/pdca-status.json`: phase = "completed"
+10. **Phase registry (automatic)**: the phase advances to `"completed"` via the TaskCompleted hook when the `[Report] {feature}` Task (step 9) is marked completed. Verify only — never hand-edit the registry
 
 **Output Path**: `docs/04-report/{feature}.report.md`
 
@@ -385,14 +385,18 @@ Feature: user-auth
 
 ### archive (Archive Phase)
 
-1. Verify Report completion status (phase = "completed" or matchRate >= 90%)
-2. **Complete the terminal Task**: Use TaskList to find the `[Report] {feature}` Task and any other `[Phase] {feature}` Task for this feature still `in_progress`, and TaskUpdate each to `status: "completed"` — the feature is terminal, so no phase Task should remain open (see [Phase Transition Rule](#task-integration)).
-3. Verify PDCA documents exist (plan, design, analysis, report)
-4. Create `docs/archive/YYYY-MM/{feature}/` folder
-5. Move documents (delete from original location)
-6. Update Archive Index (`docs/archive/YYYY-MM/_INDEX.md`)
-7. Update .bkit/state/pdca-status.json: phase = "archived", record archivedTo path
-8. Remove feature from status (or preserve summary with `--summary` option)
+1. **Complete the terminal Task**: Use TaskList to find the `[Report] {feature}` Task and any other `[Phase] {feature}` Task for this feature still `in_progress`, and TaskUpdate each to `status: "completed"` — the feature is terminal, so no phase Task should remain open (see [Phase Transition Rule](#task-integration)).
+2. **Run the sanctioned archive CLI** (dry-run first, always):
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/pdca-archive.js" {feature}
+   ```
+   The CLI verifies the completion gate (phase = "completed" or matchRate >= 90), checks the documents exist, and prints the archive plan — mutating nothing.
+3. **Apply** when the plan is correct:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/pdca-archive.js" {feature} --apply
+   ```
+   (add `--summary` to preserve a lightweight metrics summary). The CLI moves the documents to `docs/archive/YYYY-MM/{feature}/`, updates `_INDEX.md`, and writes `phase = "archived"` + `archivedTo` through `lib/pdca/lifecycle.js` `archiveFeature` — the registry is never hand-edited (G-020 denies agent writes to it).
+4. Verify the CLI's JSON result (`archived: true`) and report the archive path. On an error exit (2 not-found / 3 gate / 4 docs), surface the JSON — do not work around the gate.
 
 **Arguments**:
 | Argument | Description | Example |
@@ -485,14 +489,17 @@ Select features to cleanup:
 
 ### status (Status Check)
 
-1. Read the status through `getPdcaStatusView()` (`lib/pdca/status.js`), never
-   the file alone. It returns the stored `.bkit/state/pdca-status.json` with any
-   feature whose phase is evidenced only by its documents filled in, and marks
-   each feature's `source` as `status-file` or `documents`.
-   `.bkit-memory.json` is a deprecated v1.6.0 legacy path that no lib module
-   reads or writes; the migrated `.bkit/state/memory.json` holds the 9-phase
-   pipeline status, which is a different thing from the PDCA phase.
-2. Display current feature, PDCA phase, Task status
+1. **MCP-first read**: query the `bkit_pdca_status` MCP tool (bkit-pdca-server)
+   for current PDCA state. It reads through `getPdcaStatusView()`
+   (`lib/pdca/status.js`), never the file alone: the view returns the stored
+   `.bkit/state/pdca-status.json` with any feature whose phase is evidenced
+   only by its documents filled in, and marks each feature's `source` as
+   `status-file` or `documents`. Only when MCP is unavailable, fall back to
+   the `lib/pdca/status-core.js` API (`getPdcaStatusFull()`) — never a raw
+   file read of the registry. Note: `.bkit-memory.json` is a deprecated
+   v1.6.0 legacy path that no lib module reads or writes; the migrated
+   `.bkit/state/memory.json` holds the 9-phase pipeline status, which is a
+   different thing from the PDCA phase.2. Display current feature, PDCA phase, Task status
 3. Visualize progress
 4. For any feature whose `source` is `documents`, add one line:
    `phase read from documents — no run recorded it`. Do not present it as a
@@ -531,7 +538,14 @@ Iteration: 2/5
 
 ## Template References
 
-Templates loaded from imports are used when executing each action:
+Templates live in the **bkit plugin's `templates/` directory — NOT the project root**:
+
+- Resolved path: `${CLAUDE_PLUGIN_ROOT}/templates/<template>.md`
+- Marketplace install: `~/.claude/plugins/cache/bkit-marketplace/bkit/<version>/templates/`
+- bkit repo checkout: `<repo-root>/templates/`
+
+Every `templates/<name>` reference in the action steps above resolves against that
+directory. Do not search the project for templates; read the resolved path directly.
 
 | Action | Template | Purpose |
 |--------|----------|---------|

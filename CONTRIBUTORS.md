@@ -24,12 +24,7 @@ We welcome contributions from the community! Please see [CONTRIBUTING.md](CONTRI
 
 ## Contributors List
 
-<!--
-Add contributors here as they join the project.
-Format: - [@username](https://github.com/username) - Description of contribution
--->
-
-*Become the first community contributor!*
+- [@dizzybeaver](https://github.com/dizzybeaver) - Bug-fix waves across the PDCA Stop-handler pipeline (terminal-state guards, feature binding, archive CLI), ESLint flat-config coverage, and QA hardening
 
 ---
 

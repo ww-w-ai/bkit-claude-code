@@ -1,0 +1,136 @@
+# registry-lockdown QA Report
+
+**Version:** 1.0
+**Date:** 2026-09-07
+**Feature:** registry-lockdown
+**Executor:** bkit:qa-lead (L4 autonomous run — AskUserQuestion banned)
+**Design doc:** docs/02-design/features/registry-lockdown.design.md §8
+**Branch:** fix/misc_fixes_972026 · **Node:** v20.19.2 (lookbehind OK)
+**Korean sibling:** registry-lockdown.qa-report.ko.md
+
+---
+
+## Verdict: QA_PASS
+
+| Criterion | Threshold | Measured | Result |
+|---|---|---|---|
+| Feature-layer pass rate | >= 95% | 100% (86/86 TC) | PASS |
+| Battery pass rate | >= 95% | 99.9% (5350/5355, 0 FAIL) | PASS |
+| Critical findings | 0 | 0 | PASS |
+| L1 unit | 100% | 31/31 | PASS |
+| L2 hook pipeline | >= 95% | 4/4 | PASS |
+| L3 e2e lifecycle | >= 90% | 11/11 | PASS |
+| L4 perf (hook wall-time) | < 5000 ms | worst 82.8 ms | PASS |
+| L5 security | >= 90% | 40/40 | PASS |
+
+---
+
+## Measured vs Not Measured
+
+**Measured:** L1 unit suites (3 files, 31 TC), L2 synthetic-stdin hook pipeline (4 TC),
+L3 simulated fire-to-archive lifecycle (11 TC), L5 guard/security suites (40 TC),
+L4 hook invocation wall-time (7 runs x 2 hooks), full battery (`node test/run-all.js`, 5355 TC).
+
+**Not measured (stated plainly, not as 0%):**
+
+- Chrome MCP / Playwright browser layers — **skipped, not applicable**: no UI, no HTTP
+  server; Chrome MCP not connected. Recorded as skipped with reason, never as failures.
+  Chrome capability probe (Phase 2.5) not performed for the same reason.
+- Real in-Claude-Code skill-fire of `/pdca` — **not measured**; L3 simulates the full
+  path through the same effects runner the hooks use, minus the CC process itself
+  (per design §8.4).
+- The battery's 5 skipped TCs (4 performance, 1 contract) were not attributed
+  individually — none sit in this feature's suites (0 FAIL overall).
+- Runtime log evidence (qa-monitor) — **skipped**: no running service to observe
+  (no server; hooks are short-lived processes).
+
+---
+
+## Per-Layer Results (verbatim summary lines)
+
+### L1 Unit — 31/31 PASS
+
+```text
+destructive-detector.registry-lockdown.test.js: 14 passed, 0 failed
+pdca-archive-cli.test.js: 7 passed, 0 failed
+skill-invocation-effects.test.js: 10 passed, 0 failed
+```
+
+### L2 Hook Pipeline (synthetic stdin through real hook scripts) — 4/4 PASS
+
+```text
+registry-lockdown.hooks.test.js: 4 passed, 0 failed
+```
+
+Covers design §8.3: registry Write blocked with skill-fire guidance naming `/pdca`;
+`.md` doc write containing registry-path prose allowed end-to-end; Bash registry write
+blocked (parity with Write path).
+
+### L3 E2E Lifecycle — 11/11 PASS
+
+```text
+registry-lockdown.e2e.test.js: 11 passed, 0 failed
+```
+
+Fire-to-archive with zero manual registry writes, isolated temp project (issue-135 style).
+
+### L4 Performance — PASS
+
+Probe `/tmp/l4-hook-perf.js`: hrtime around full hook invocation (spawn + run + exit),
+payloads identical to L2; 7 invocations per hook; budget = 5000 ms PreToolUse timeout.
+
+```text
+pre-write.js         : cold=79.0ms warm-min=75.3ms warm-median=78.2ms warm-max=82.8ms
+unified-bash-pre.js  : cold=79.2ms warm-min=71.2ms warm-median=75.7ms warm-max=76.4ms
+```
+
+Worst observed 82.8 ms = 1.7% of budget; blocked verdicts confirmed during measurement.
+
+### L5 Security — 40/40 PASS
+
+```text
+destructive-rules.test.js: Total: 25 | Pass: 25 | Fail: 0
+security-by-default-v2.test.js: 15/15 PASS, 0 FAIL, 0 SKIP
+```
+
+---
+
+## Full Battery (`node test/run-all.js`)
+
+Exit 0. Verbatim final summary lines:
+
+```text
+> Total: 5355 TC, 5350 PASS, 0 FAIL, 5 SKIP
+|  **Total**  | **5355** | **5350** | **0** | **5** | **99.9%** |
+
+**ALL TESTS PASSED** - bkit v2.1.38 is ready for release.
+```
+
+All five feature suites appear inside the battery with 0 FAIL
+(unit x3, integration x2). The battery rewrote
+docs/04-report/features/bkit-v200-test.report.md; it was restored via
+`git checkout --` immediately after the run (restored confirmed).
+
+---
+
+## Carry Items
+
+1. **CHANGELOG entry** — to be added post-archive; unreleased heading, version number
+   left to the maintainer per project rules (no agent version bumps).
+2. **Accepted deviations** (docs/03-analysis/registry-lockdown.analysis.md):
+   - #7 (Minor, accepted): `git mv` not used for doc moves — `renameSync` + EXDEV
+     equivalent; git detects renames.
+   - #9 (Minor, accepted): FR-03 sprint boundary not added to skill text — sprint
+     archive flows through its own sanctioned writer
+     (`lib/application/sprint-lifecycle/archive-sprint.usecase.js`); G-020 covers
+     sprint state files.
+   - #11 (Minor, accepted): test comment numbering, cosmetic.
+3. **Observation (not a defect in this branch):** during QA, this session's own
+   read-only Bash call (`cat <registry> 2>/dev/null | head`) was denied as G-019 by
+   the live session hooks. The branch's L1/L2 suites prove the fixed detector allows
+   descriptor-redirect read forms; the live hooks evidently sourced a detector copy
+   predating this branch's fix. Cause not verified in-session — noted for the operator.
+
+---
+
+*Generated by bkit:qa-lead on 2026-09-07 from live test runs in this session.*

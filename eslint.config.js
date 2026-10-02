@@ -143,6 +143,38 @@ export default [
     },
   },
 
+  // Override — the flat config itself (br292). It is ESM (`export default`)
+  // but the base block above lints every **/*.js with sourceType "script",
+  // so eslint fails to parse its own config. Scope module semantics to this
+  // one file.
+  {
+    files: ["eslint.config.js"],
+    languageOptions: { sourceType: "module" },
+  },
+
+  // Override — jest test files (br289). package.json jest `testMatch` covers
+  // test-scripts/{unit,integration,regression}/** (br016, a8ba937), but the
+  // flat config never declared the jest globals those files run with, so
+  // every describe/it/expect reference was a no-undef (210 errors). Inlined
+  // literal (not the `globals` package jest set) per the import-free
+  // constraint documented at the top of this file.
+  {
+    files: ["test-scripts/**/*.test.js"],
+    languageOptions: {
+      globals: {
+        describe: "readonly",
+        it: "readonly",
+        test: "readonly",
+        expect: "readonly",
+        beforeAll: "readonly",
+        afterAll: "readonly",
+        beforeEach: "readonly",
+        afterEach: "readonly",
+        jest: "readonly",
+      },
+    },
+  },
+
   // NOTE: overrides[2] from the legacy config (lib/domain + lib/cc-regression
   // purity rule) is intentionally NOT reproduced — see the DELIBERATE BEHAVIOR
   // CHANGE note at the top of this file. That boundary is enforced by CI

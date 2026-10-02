@@ -229,10 +229,10 @@ test('the rule set is what the docs say it is', () => {
   // ADR 0016 and AI-NATIVE-DEVELOPMENT.md both state this count in prose. A
   // guard added without updating them leaves the docs describing a system that
   // no longer exists.
-  assert.equal(detector.GUARDRAIL_RULES.length, 19);
+  assert.equal(detector.GUARDRAIL_RULES.length, 21);
   const ids = detector.GUARDRAIL_RULES.map((r) => r.id);
   assert.equal(new Set(ids).size, ids.length, 'rule ids must be unique');
-  for (const id of ['G-016', 'G-017', 'G-018']) assert.ok(ids.includes(id));
+  for (const id of ['G-016', 'G-017', 'G-018', 'G-019', 'G-020']) assert.ok(ids.includes(id));
 });
 
 // ---------------------------------------------------------------------------

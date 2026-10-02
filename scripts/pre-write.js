@@ -238,6 +238,14 @@ function runTaskSystemGuidance(ctx, pdcaCtx, taskCtx) {
 
 /**
  * Stage 6: Destructive detector (v2.0.0 control module).
+ *
+ * registry-lockdown (2026-09-07): deny-action rules now BLOCK. Before this,
+ * every detection was pushed into `contextParts` and emitted via
+ * `outputAllow` — the engine correctly detected G-020 on a registry Write
+ * while the write proceeded, and the audit trail recorded
+ * `destructive_blocked` / `result: 'blocked'` for writes that were actually
+ * allowed (the ENH-388 false-assurance class, live-confirmed by probe). The
+ * verdict-object pattern is ENH-398's scope block, 20 lines below.
  */
 function runDestructiveDetector(ctx) {
   try {
@@ -245,22 +253,54 @@ function runDestructiveDetector(ctx) {
     const toolInput = { file_path: ctx.filePath, content: ctx.content };
     const result = dd.detect('Write', toolInput);
     if (result.detected) {
+      const denying = (result.rules || []).filter((r) => r.action === 'deny');
+      if (denying.length > 0) {
+        try {
+          const audit = require('../lib/audit/audit-logger');
+          audit.writeAuditLog({
+            actor: 'hook',
+            actorId: 'pre-write',
+            action: 'destructive_blocked',
+            category: 'control',
+            target: toolInput.file_path || '',
+            targetType: 'file',
+            details: { rules: result.rules },
+            result: 'blocked',
+            destructiveOperation: true,
+            blastRadius: 'medium',
+          });
+        } catch (e) {
+          debugLog('PreToolUse', 'audit write failed (destructive)', { error: e.message });
+        }
+        return {
+          block: true,
+          rule: denying[0].id,
+          reason: `Destructive operation denied: ${denying.map((r) => `${r.id} (${r.name})`).join('; ')}.`,
+          alternatives: [
+            'The PDCA registry (.bkit/state/) is broker-only-writable — phases advance ONLY by firing the skill: /pdca <phase> <feature>',
+            'To archive a completed feature, run: node scripts/pdca-archive.js <feature> (dry-run first, --apply to mutate)',
+            'To READ state, use the bkit_pdca_status MCP tool instead of writing or opening the registry',
+          ],
+        };
+      }
+      // Advisory detections (ask-grade rules) stay annotations — with an
+      // honest audit entry. 'blocked' is reserved for actual blocks now.
       try {
         const audit = require('../lib/audit/audit-logger');
         audit.writeAuditLog({
           actor: 'hook',
           actorId: 'pre-write',
-          action: 'destructive_blocked',
+          action: 'destructive_detected',
           category: 'control',
           target: toolInput.file_path || '',
           targetType: 'file',
           details: { rules: result.rules },
-          result: 'blocked',
-          destructiveOperation: true,
+          result: 'advisory',
+          destructiveOperation: false,
           blastRadius: 'medium',
         });
       } catch (e) {
-        debugLog('PreToolUse', 'audit write failed (destructive)', { error: e.message });
+        debugLog('PreToolUse', 'audit write failed (destructive advisory)', { error: e.message });
       }
       return `Destructive operation detected: ${result.rules.map((r) => r.id || r.reason).join(', ')}`;
     }
@@ -468,6 +508,16 @@ function main() {
 
   // Stage 6-8
   const dest = runDestructiveDetector(ctx);
+  /*
+   * registry-lockdown: a deny-action detection must stop the write. Same
+   * verdict-object contract as the scope block below — advisory strings
+   * still flow into contextParts.
+   */
+  if (dest && typeof dest === 'object' && dest.block) {
+    debugLog('PreToolUse', 'Destructive denied', { filePath, rule: dest.rule });
+    outputBlockWithContext(dest.reason, dest.alternatives, 'PreToolUse');
+    return;
+  }
   if (dest) contextParts.push(dest);
   const blast = runBlastRadius(ctx);
   if (blast) contextParts.push(blast);

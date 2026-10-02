@@ -107,7 +107,7 @@ Based on research from industry leaders (Addy Osmani, Sapphire Ventures, DevOps.
 - **Quality Gates (7 stages)**: Configurable thresholds per phase transition
 - **Audit trail**: JSONL logging + decision tracer for full transparency
 - **Emergency stop**: Immediate pause with checkpoint/rollback support
-- **Destructive detection**: 19 known-pattern rules (recursive delete, force push, obfuscated execution, raw-device writes, remote-script piping, SQL/NoSQL drops, untracked-file deletion, uncommitted-change discard, reflog destruction). Rules are matched against a single command segment, not the whole input, so a chained command cannot lend its tokens to a neighbour (v2.1.36). Where the target decides the stakes — recursive delete (G-001) and find-based delete (G-013) — a broad target denies and a specific one asks; the other rules describe shapes that are dangerous regardless of target and do not grade. A denylist holds only for the spellings someone wrote down, so this is a known-pattern guard, not a complete defense, and the rules cannot be switched off at runtime (ADR 0016).
+- **Destructive detection**: 21 known-pattern rules (recursive delete, force push, obfuscated execution, raw-device writes, remote-script piping, SQL/NoSQL drops, untracked-file deletion, uncommitted-change discard, reflog destruction, broker-state modification, registry state write). Rules are matched against a single command segment, not the whole input, so a chained command cannot lend its tokens to a neighbour (v2.1.36). Where the target decides the stakes — recursive delete (G-001) and find-based delete (G-013) — a broad target denies and a specific one asks; the other rules describe shapes that are dangerous regardless of target and do not grade. A denylist holds only for the spellings someone wrote down, so this is a known-pattern guard, not a complete defense, and the rules cannot be switched off at runtime (ADR 0016).
 
 ---
 
@@ -195,7 +195,7 @@ bkit implements **Context Engineering**—the systematic curation of context tok
 | **CLAUDE.md Files** | Project-specific AI instructions |
 | **Skill System (44 skills)** | Domain-specific knowledge (v2.1.11 added bkit-evals, bkit-explore, pdca-watch, pdca-fast-track) |
 | **21-Event Hook System** | Centralized context injection via hooks.json (21 events / 24 blocks, 63 scripts); 3 attribution sites (Stop/SessionEnd/SubagentStop) |
-| **lib/ (201 modules)** | 22 subdirectories Clean Architecture 4-Layer with 7 Port↔Adapter pairs: application (v2.1.11 γ2 pilot), audit, cc-regression, control, core, **dashboard** (v2.1.11 β4), **defense**, **discovery** (v2.1.11 β1), **domain**, **evals** (v2.1.11 β2), **i18n** (v2.1.11 β3/β6), **infra**, intent, **orchestrator**, pdca, qa, quality, **sprint** (v2.1.13), task, team, ui, **util** |
+| **lib/ (202 modules)** | 22 subdirectories Clean Architecture 4-Layer with 7 Port↔Adapter pairs: application (v2.1.11 γ2 pilot), audit, cc-regression, control, core, **dashboard** (v2.1.11 β4), **defense**, **discovery** (v2.1.11 β1), **domain**, **evals** (v2.1.11 β2), **i18n** (v2.1.11 β3/β6), **infra**, intent, **orchestrator**, pdca, qa, quality, **sprint** (v2.1.13), task, team, ui, **util** |
 
 **Context Engineering Architecture (v2.1.13)**:
 ```

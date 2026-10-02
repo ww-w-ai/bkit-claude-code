@@ -13,63 +13,67 @@ const { readStdinSync, outputAllow } = require('../lib/core/io');
 const { debugLog } = require('../lib/core/debug');
 const { getPdcaStatusFull } = require('../lib/pdca/status');
 
-let input;
-try {
-  input = readStdinSync();
-} catch (e) {
-  debugLog('StopFailure', 'Failed to read stdin', { error: e.message });
-  process.exit(0);
-}
+// ============================================================
+// Pure parse/classify helpers (bugfix-wave-20260919 §4 Fix 5) — factored so
+// unit tests can require them without executing the hook. classifyError is
+// hoisted (function declaration); parseFailurePayload encapsulates the
+// multi-source message extraction + parseStatus derivation.
+// ============================================================
 
-// v2.1.12 Sprint A-2 (defect #14 fix): enrich error context capture.
-// Previously, all 13+ entries had errorType/category/agentId all 'unknown' or
-// null because CC StopFailure payload schema does not always include
-// error_type / error_message / agent_id at top-level. We now:
-//   (1) Try multiple field paths (top-level + nested message.*)
-//   (2) Capture parseStatus + parseWarnings to surface fallback usage
-//   (3) Use sessionHash fallback when agentId absent
-const errorType = input.error_type || input.errorType
-  || (input.message && input.message.error_type)
-  || (input.error && input.error.type)
-  || 'unknown';
-let errorMessage = input.error_message || input.errorMessage;
-if (!errorMessage && typeof input.message === 'string') errorMessage = input.message;
-if (!errorMessage && input.message && typeof input.message === 'object') {
-  // Anthropic API error format: input.message.content[0].text or input.error.message
-  const msgContent = input.message.content;
-  if (Array.isArray(msgContent) && msgContent[0] && typeof msgContent[0].text === 'string') {
-    errorMessage = msgContent[0].text;
-  } else if (input.error && typeof input.error.message === 'string') {
-    errorMessage = input.error.message;
+/** Bare-require guard: export pure helpers when require()-d, don't run the hook. */
+// Design Ref: §4 Fix 5 — pure helpers, module scope so the bare-require export
+// below sees real functions regardless of which branch runs.
+function parseFailurePayload(payload) {
+  const errorType = payload?.error_type || payload?.errorType
+    || (payload?.message && payload.message.error_type)
+    || (payload?.error && typeof payload.error === 'object' && payload.error.type)
+    || 'unknown';
+  let errorMessage = payload?.error_message || payload?.errorMessage;
+  if (!errorMessage && typeof payload?.message === 'string') errorMessage = payload.message;
+  if (!errorMessage && payload?.message && typeof payload.message === 'object') {
+    const msgContent = payload.message.content;
+    if (Array.isArray(msgContent) && msgContent[0] && typeof msgContent[0].text === 'string') {
+      errorMessage = msgContent[0].text;
+    }
   }
+  // Fix 5: observed payloads carry the failure in `error` (plain string) and
+  // `last_assistant_message`; both were previously ignored.
+  if (!errorMessage && typeof payload?.error === 'string') {
+    errorMessage = payload.error;
+  }
+  if (!errorMessage && typeof payload?.last_assistant_message === 'string') {
+    errorMessage = payload.last_assistant_message;
+  } else if (!errorMessage && payload?.last_assistant_message && typeof payload.last_assistant_message === 'object') {
+    const lamContent = payload.last_assistant_message.content;
+    if (Array.isArray(lamContent) && lamContent[0] && typeof lamContent[0].text === 'string') {
+      errorMessage = lamContent[0].text;
+    }
+  }
+  if (!errorMessage && payload?.error && typeof payload.error === 'object' && typeof payload.error.message === 'string') {
+    errorMessage = payload.error.message;
+  }
+  errorMessage = errorMessage || '';
+
+  // Fix 5: derive errorType from the message classification when the payload
+  // gave no explicit type but did carry a message.
+  let effectiveErrorType = errorType;
+  if (effectiveErrorType === 'unknown' && errorMessage) {
+    effectiveErrorType = classifyError('unknown', errorMessage).category;
+  }
+
+  const hasUsefulFields = (effectiveErrorType !== 'unknown') || errorMessage.length > 0
+    || payload?.agent_id || payload?.agent_type || payload?.message?.agent_id || payload?.message?.agent_type;
+  const parseStatus = !payload || Object.keys(payload).length === 0
+    ? 'no_input'
+    : hasUsefulFields ? 'ok' : 'partial';
+  const parseWarnings = parseStatus === 'no_input'
+    ? 'StopFailure hook invoked with empty stdin payload'
+    : (parseStatus === 'partial'
+        ? `StopFailure payload missing useful fields (keys: ${Object.keys(payload).join(',')})`
+        : null);
+  return { errorType: effectiveErrorType, errorMessage, parseStatus, parseWarnings };
 }
-errorMessage = errorMessage || '';
-const agentId = input.agent_id || (input.message && input.message.agent_id) || null;
-const agentType = input.agent_type || (input.message && input.message.agent_type) || null;
-const sessionId = input.session_id || (input.message && input.message.session_id) || null;
 
-// parseStatus: surface payload health for downstream postmortem
-const hasUsefulFields = (errorType !== 'unknown') || errorMessage.length > 0 || agentId || agentType;
-const parseStatus = !input || Object.keys(input).length === 0
-  ? 'no_input'
-  : hasUsefulFields ? 'ok' : 'partial';
-const parseWarnings = parseStatus === 'no_input'
-  ? 'StopFailure hook invoked with empty stdin payload'
-  : (parseStatus === 'partial'
-      ? `StopFailure payload missing useful fields (keys: ${Object.keys(input).join(',')})`
-      : null);
-
-debugLog('StopFailure', 'Hook started', {
-  errorType,
-  errorMessage: errorMessage.substring(0, 200),
-  agentId,
-  agentType,
-  parseStatus,
-  parseWarnings,
-  sessionId,
-});
-
-// Step 1: Classify error
 function classifyError(type, message) {
   const msg = (message || '').toLowerCase();
 
@@ -121,6 +125,17 @@ function classifyError(type, message) {
     };
   }
 
+  // Fix 5: bare "Exit code N" strings from CC StopFailure payloads previously
+  // fell through to 'unknown'; give them their own category so the derived
+  // errorType is actionable instead of unknown.
+  if (msg.includes('exit code')) {
+    return {
+      category: 'exit_code',
+      severity: 'low',
+      recovery: 'Process exited with a non-zero code. Inspect the transcript for the failing step.',
+    };
+  }
+
   return {
     category: 'unknown',
     severity: 'low',
@@ -128,7 +143,50 @@ function classifyError(type, message) {
   };
 }
 
-const classification = classifyError(errorType, errorMessage);
+if (require.main === module) {
+
+/**
+ * Pure extraction of { errorType, errorMessage, parseStatus, parseWarnings }
+ * from a raw StopFailure payload. Design Ref: §4 Fix 5.
+ * @param {Object|null} payload
+ * @returns {{ errorType: string, errorMessage: string, parseStatus: string, parseWarnings: string|null }}
+ */
+
+let input;
+try {
+  input = readStdinSync();
+} catch (e) {
+  debugLog('StopFailure', 'Failed to read stdin', { error: e.message });
+  process.exit(0);
+}
+
+// v2.1.12 Sprint A-2 (defect #14 fix): enrich error context capture via
+// parseFailurePayload (see above for the multi-source extraction rules;
+// Fix 5 adds string `error` + last_assistant_message sources and derives
+// errorType from the classification when absent).
+const {
+  errorType: effectiveErrorType,
+  errorMessage,
+  parseStatus,
+  parseWarnings,
+} = parseFailurePayload(input);
+const agentId = input.agent_id || (input.message && input.message.agent_id) || null;
+const agentType = input.agent_type || (input.message && input.message.agent_type) || null;
+const sessionId = input.session_id || (input.message && input.message.session_id) || null;
+
+debugLog('StopFailure', 'Hook started', {
+  errorType: effectiveErrorType,
+  errorMessage: errorMessage.substring(0, 200),
+  agentId,
+  agentType,
+  parseStatus,
+  parseWarnings,
+  sessionId,
+});
+
+// Step 1: Classify error
+
+const classification = classifyError(effectiveErrorType, errorMessage);
 
 // M9 fix (audit): capture (don't swallow) a failure to persist the error log so
 // it can be surfaced in the user-visible guidance below. The catch stays non-fatal
@@ -151,7 +209,7 @@ try {
   // for downstream postmortem (silent garbage-in surface).
   const entry = {
     timestamp: new Date().toISOString(),
-    errorType,
+    errorType: effectiveErrorType,
     category: classification.category,
     severity: classification.severity,
     agentId,
@@ -188,7 +246,7 @@ try {
     backupToPluginData();
     debugLog('StopFailure', 'Emergency backup saved');
   }
-} catch (_) { /* non-critical */ }
+} catch { /* non-critical */ }
 
 // Step 4: Generate recovery guidance
 let guidance = `API Error: ${classification.category}. `;
@@ -217,3 +275,9 @@ debugLog('StopFailure', 'Hook completed', {
   severity: classification.severity,
   agentId
 });
+}
+
+// Bare-require guard: pure helpers exported below when require()-d (module-scope fns,
+// declared above, are only initialized after the hook branch evaluates... both
+// are function declarations hoisted to module scope — export at the end).
+module.exports = { classifyError, parseFailurePayload };

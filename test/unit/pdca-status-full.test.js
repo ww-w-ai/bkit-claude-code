@@ -276,21 +276,27 @@ console.log('\n--- Section 13: deleteFeatureFromStatus ---');
   }
 }
 
-// PS-019: deleteFeatureFromStatus rejects active non-archived feature
+// PS-019: deleteFeatureFromStatus rejects LIVE active non-archived feature.
+// Bugfix wave 20260919 §3 Fix 3: an active feature whose plan/design docs are
+// both gone is a sanctioned ORPHAN and is now deletable (covered by
+// status-cleanup-orphan.test.js). Refusal is only contracted for features
+// that still have docs on disk, so PS-019 selects doc-backed features only.
 {
   if (moduleLoaded) {
     const fullStatus = status.loadPdcaStatus();
+    const { findPlanDoc, findDesignDoc } = require('../../lib/pdca/phase');
     const activeFeats = (fullStatus?.activeFeatures || []).filter(f => {
       const feat = fullStatus.features[f];
-      return feat && feat.phase !== 'archived' && feat.phase !== 'completed';
+      return feat && feat.phase !== 'archived' && feat.phase !== 'completed' &&
+        (!!findPlanDoc(f) || !!findDesignDoc(f));
     });
     if (activeFeats.length > 0) {
       const result = status.deleteFeatureFromStatus(activeFeats[0]);
       assert('PS-019',
         result.success === false && result.reason === 'Cannot delete active feature',
-        'deleteFeatureFromStatus rejects active non-archived feature');
+        'deleteFeatureFromStatus rejects live (doc-backed) active non-archived feature');
     } else {
-      skip('PS-019', 'No active non-archived features to test');
+      skip('PS-019', 'No live doc-backed non-archived features to test');
     }
   } else {
     skip('PS-019', 'Module not loaded');

@@ -530,7 +530,7 @@ function buildVersionEnhancementsContext(detectedLevel) {
   // v2.1.10 (ENH-167): removed hard-coded strings, uses BKIT_VERSION
   ctx += `\n## bkit v${BKIT_VERSION} (Current)\n`;
   ctx += `- CC recommended: v2.1.220 (fork background-default handled; Claude 5 alias resolution) | verified against v2.1.232 | model floor: v2.1.170+ for Fable-pinned agents | install floor: v2.1.143 (displayName schema)\n`;
-  ctx += `- Architecture: 44 Skills, 34 Agents, 21 Hook Events (24 blocks / 28 handlers), 200 Lib Modules (22 subdirs, 8 Port↔Adapter pairs), 2 MCP Servers (19 tools), 19 guardrail rules, Sprint Management (v2.1.13 GA)\n`;
+  ctx += `- Architecture: 44 Skills, 34 Agents, 21 Hook Events (24 blocks / 28 handlers), 200 Lib Modules (22 subdirs, 8 Port↔Adapter pairs), 2 MCP Servers (19 tools), 21 guardrail rules, Sprint Management (v2.1.13 GA)\n`;
   ctx += `- v2.1.38: the QA phase now reports what it measured. Stop handlers receive the hook payload and read the agent's own report, so M1-M16 carry real readings instead of defaults; the \`qa\` gate can reach \`pass\`; L3-L5 browser tests run when Chrome MCP is actually connected; and an unmeasured rate reads "not measured", never 0%\n`;
   ctx += `- v2.1.38: a QA failure returns to QA. \`act → qa\` (QA_RETRY) is emitted and its counter advances, so \`guardrails.loopBreaker.maxQaRetries\` (default 3) is a real ceiling on the qa ↔ act loop\n`;
   ctx += `- v2.1.37: bkit reads the host's permission mode. Under \`--dangerously-skip-permissions\`, \`dontAsk\` or \`acceptEdits\` it no longer asks for confirmation — but \`rm -rf /\`, force pushes, \`curl … | sh\` and SQL drops stay refused in every mode\n`;

@@ -8,7 +8,7 @@
 
 ## Context
 
-The Destructive Detector refuses commands that match one of 19 known-pattern
+The Destructive Detector refuses commands that match one of 21 known-pattern
 rules. When it refuses, it must tell the user what to do next.
 
 Until v2.1.36 the refusal message said:

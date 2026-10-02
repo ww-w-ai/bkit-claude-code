@@ -197,13 +197,32 @@ tc('L2-004', 'gap-detector-stop bare-require emits no stdout (#9)', () => {
   const r = cp.spawnSync('node', ['-e', "const m = require('./scripts/gap-detector-stop'); console.log(JSON.stringify(m));"], {
     cwd: ROOT, encoding: 'utf8', timeout: 5000,
   });
-  assertEq(r.stdout.trim(), '{}', `expected {} bare-require output, got: ${r.stdout.slice(0, 80)}`);
+  // Dual-mode contract (v2.1.40, rb002): bare-require exports the shared
+  // helpers and prints NOTHING at require time — stdout must parse as exactly
+  // that one JSON object. (The old `=== '{}'` expectation encoded the
+  // pre-dual-mode contract and went stale when matchRatePattern was exported.)
+  let parsed = null;
+  try { parsed = JSON.parse(r.stdout.trim()); } catch { parsed = null; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    assertEq('(clean JSON exports)', r.stdout.slice(0, 80), 'bare-require emitted stdout noise');
+  }
+  // JSON.stringify drops function exports; matchRatePattern (RegExp → {}) is
+  // the one JSON-visible key proving the dual-mode export surface is live.
+  assertEq('matchRatePattern' in parsed, true);
 });
 tc('L2-006', 'pdca-skill-stop bare-require emits no stdout (#10)', () => {
   const r = cp.spawnSync('node', ['-e', "const m = require('./scripts/pdca-skill-stop'); console.log(JSON.stringify(m));"], {
     cwd: ROOT, encoding: 'utf8', timeout: 5000,
   });
-  assertEq(r.stdout.trim(), '{}');
+  // Dual-mode contract (br014): bare-require exports the envelope helpers and
+  // prints NOTHING at require time — stdout must parse as exactly that one
+  // JSON object. (Old `=== '{}'` encoded the pre-dual-mode contract.)
+  let parsed = null;
+  try { parsed = JSON.parse(r.stdout.trim()); } catch { parsed = null; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    assertEq('(clean JSON exports)', r.stdout.slice(0, 80), 'bare-require emitted stdout noise');
+  }
+  assertEq(Array.isArray(parsed.ENVELOPE_ACTIONS), true);
 });
 
 tc('L2-008', 'createCheckpoint → verifyCheckpoint roundtrip (#12)', () => {

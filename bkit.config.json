@@ -9,7 +9,14 @@
     },
     "dashboard": {
       "enabled": true,
-      "sections": ["progress", "workflow", "impact", "agent", "control", "sqm"]
+      "sections": [
+        "progress",
+        "workflow",
+        "impact",
+        "agent",
+        "control",
+        "sqm"
+      ]
     },
     "contextInjection": {
       "enabled": true,
@@ -38,7 +45,16 @@
       "enabled": true,
       "minTrustScore": 80,
       "autoLevel": "L3",
-      "skipCheckpoints": [1, 2, 3, 4, 5, 6, 7, 8],
+      "skipCheckpoints": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
       "fallbackLevel": "L2"
     }
   },
@@ -46,31 +62,63 @@
     "docPaths": {
       "plan": [
         "docs/01-plan/features/{feature}.plan.md",
+        "docs/01-plan/features/{feature}.plan.en.md",
+        "docs/01-plan/features/{feature}.plan.ko.md",
         "docs/01-plan/{feature}.plan.md",
-        "docs/plan/{feature}.md"
+        "docs/01-plan/{feature}.plan.en.md",
+        "docs/01-plan/{feature}.plan.ko.md",
+        "docs/plan/{feature}.md",
+        "docs/plan/{feature}.en.md",
+        "docs/plan/{feature}.ko.md"
       ],
       "design": [
         "docs/02-design/features/{feature}.design.md",
+        "docs/02-design/features/{feature}.design.en.md",
+        "docs/02-design/features/{feature}.design.ko.md",
         "docs/02-design/{feature}.design.md",
-        "docs/design/{feature}.md"
+        "docs/02-design/{feature}.design.en.md",
+        "docs/02-design/{feature}.design.ko.md",
+        "docs/design/{feature}.md",
+        "docs/design/{feature}.en.md",
+        "docs/design/{feature}.ko.md"
       ],
       "analysis": [
         "docs/03-analysis/features/{feature}.analysis.md",
+        "docs/03-analysis/features/{feature}.analysis.en.md",
+        "docs/03-analysis/features/{feature}.analysis.ko.md",
         "docs/03-analysis/{feature}.analysis.md",
-        "docs/03-analysis/{feature}.gap-analysis.md"
+        "docs/03-analysis/{feature}.analysis.en.md",
+        "docs/03-analysis/{feature}.analysis.ko.md",
+        "docs/03-analysis/{feature}.gap-analysis.md",
+        "docs/03-analysis/{feature}.en.gap-analysis.md",
+        "docs/03-analysis/{feature}.ko.gap-analysis.md"
       ],
       "report": [
         "docs/04-report/features/{feature}.report.md",
+        "docs/04-report/features/{feature}.report.en.md",
+        "docs/04-report/features/{feature}.report.ko.md",
         "docs/04-report/{feature}.report.md",
-        "docs/04-report/{feature}.completion-report.md"
+        "docs/04-report/{feature}.report.en.md",
+        "docs/04-report/{feature}.report.ko.md",
+        "docs/04-report/{feature}.completion-report.md",
+        "docs/04-report/{feature}.en.completion-report.md",
+        "docs/04-report/{feature}.ko.completion-report.md"
       ],
       "qa": [
         "docs/05-qa/features/{feature}.qa-report.md",
-        "docs/05-qa/{feature}.qa-report.md"
+        "docs/05-qa/features/{feature}.qa-report.en.md",
+        "docs/05-qa/features/{feature}.qa-report.ko.md",
+        "docs/05-qa/{feature}.qa-report.md",
+        "docs/05-qa/{feature}.qa-report.en.md",
+        "docs/05-qa/{feature}.qa-report.ko.md"
       ],
       "pm": [
         "docs/00-pm/features/{feature}.prd.md",
-        "docs/00-pm/{feature}.prd.md"
+        "docs/00-pm/features/{feature}.prd.en.md",
+        "docs/00-pm/features/{feature}.prd.ko.md",
+        "docs/00-pm/{feature}.prd.md",
+        "docs/00-pm/{feature}.prd.en.md",
+        "docs/00-pm/{feature}.prd.ko.md"
       ],
       "archive": "docs/archive/{date}/{feature}"
     },
@@ -83,7 +131,9 @@
     "automationLevel": "semi-auto",
     "autoStartThreshold": 100,
     "fullAuto": {
-      "reviewCheckpoints": ["design"]
+      "reviewCheckpoints": [
+        "design"
+      ]
     }
   },
   "sprint": {
@@ -96,13 +146,26 @@
     "defaultMatchRateMinAcceptable": 90,
     "defaultDashboardMode": "session-start",
     "autoPause": {
-      "armedTriggers": ["QUALITY_GATE_FAIL", "ITERATION_EXHAUSTED", "BUDGET_EXCEEDED", "PHASE_TIMEOUT"]
+      "armedTriggers": [
+        "QUALITY_GATE_FAIL",
+        "ITERATION_EXHAUSTED",
+        "BUDGET_EXCEEDED",
+        "PHASE_TIMEOUT"
+      ]
     },
     "qualityGates": {
-      "M1_matchRate": { "threshold": 90 },
-      "M2_codeQualityScore": { "threshold": 80 },
-      "M3_criticalIssueCount": { "threshold": 0 },
-      "M8_matchRate": { "threshold": 85 }
+      "M1_matchRate": {
+        "threshold": 90
+      },
+      "M2_codeQualityScore": {
+        "threshold": 80
+      },
+      "M3_criticalIssueCount": {
+        "threshold": 0
+      },
+      "M8_matchRate": {
+        "threshold": 85
+      }
     },
     "contextSizing": {
       "enabled": true,
@@ -226,8 +289,12 @@
     "delegateMode": false,
     "ctoAgent": "cto-lead",
     "levelOverrides": {
-      "Dynamic": { "maxTeammates": 3 },
-      "Enterprise": { "maxTeammates": 5 }
+      "Dynamic": {
+        "maxTeammates": 3
+      },
+      "Enterprise": {
+        "maxTeammates": 5
+      }
     },
     "orchestrationPatterns": {
       "Dynamic": {

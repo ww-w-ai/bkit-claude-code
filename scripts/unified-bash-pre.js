@@ -834,10 +834,15 @@ if (!blocked && pendingAsk) {
 
 // Allow if neither blocked nor awaiting confirmation
 if (!blocked) {
-  const contextMsg = activeSkill || activeAgent
-    ? `Bash command validated for ${activeSkill || activeAgent}.`
-    : 'Bash command validated.';
-  outputAllow(contextMsg + ccRegressionAttr, 'PreToolUse');
+  // br008: silent on success — per-call "validated." context lines were parked
+  // and re-injected between turns (~KBs/turn of hook spam). Allow is the
+  // default; speak only when something needs attention (block/ask paths above).
+  if (process.env.BKIT_VERBOSE_VALIDATION === '1') {
+    const contextMsg = activeSkill || activeAgent
+      ? `Bash command validated for ${activeSkill || activeAgent}.`
+      : 'Bash command validated.';
+    outputAllow(contextMsg + ccRegressionAttr, 'PreToolUse');
+  }
 }
 
 debugLog('UnifiedBashPre', 'Hook completed', { blocked, ask: null });

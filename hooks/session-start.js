@@ -426,7 +426,7 @@ try {
     // invocation never produces), so a missing/stale skill_post is suppressed
     // unless a canary (bash_post/write_post) corroborates a real loader drop
     // (#57317). See lib/core/hook-reachability.js for the full rationale.
-    const { evaluateReachability } = require('../lib/core/hook-reachability');
+    const { evaluateReachability, buildReachabilityWarning } = require('../lib/core/hook-reachability');
     const { missing, stale, expected, canaryUnhealthy, skillPostIdle, shouldWarn } =
       evaluateReachability(state, { now: Date.now(), staleThresholdMs: STALE_THRESHOLD_MS });
     if (skillPostIdle) {
@@ -444,7 +444,10 @@ try {
           reason: `bkit MON-CC-NEW-PLUGIN-HOOK-DROP: PostToolUse hook reachability lost. missing=[${missing.join(',')}] stale=[${stale.join(',')}]`,
         });
       } catch (_) { /* graceful */ }
-      const warnMsg = `\n⚠️  bkit hook reachability check: missing=[${missing.join(',')}] stale=[${stale.join(',')}]. CC plugin-hook drop (#57317) suspected — see docs/sprint/v2114 MON-CC-NEW-PLUGIN-HOOK-DROP.`;
+      // fix-preflight-hookdrop-mislead: warning text lives in the pure builder
+      // (lib/core/hook-reachability.js) so it is unit-testable without running
+      // this script (session-start.js is main-guard-less and process.exits).
+      const warnMsg = buildReachabilityWarning(missing, stale, reachFile);
       additionalContext = warnMsg + (additionalContext ? '\n' + additionalContext : '');
     }
   }

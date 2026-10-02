@@ -37,7 +37,6 @@ node_modules/
 # are automatically picked up by `git status` — no `git add -f` needed.
 #
 # See docs/06-guide/test-file-tracking-policy.guide.md.
-test-scripts/
 test/contract/baseline/tmp/
 test/contract/baseline/.tmp/
 test/local/
@@ -101,3 +100,4 @@ bug_reports/
 docs/03-analysis/features/*.analysis.md
 !docs/03-analysis/features/*.analysis.en.md
 !docs/03-analysis/features/*.analysis.ko.md
+bkit-debug.log

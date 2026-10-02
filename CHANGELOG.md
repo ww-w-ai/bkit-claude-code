@@ -5,6 +5,270 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed — PDCA Stop-handler completion-state hardening (registry terminal guard, dead-record binding, post-completion silence)
+
+A four-layer defense now keeps a finished PDCA cycle finished. Each layer sits at a
+different chokepoint of the Stop pipeline, so a stale skill-fire replay cannot corrupt
+registry state or pressure the agent into fabricating new work:
+
+- **Terminal-state write guard (`lib/pdca/status-core.js`).** `updatePdcaStatus`
+  rejects non-archive phase writes against features carrying archived markers
+  (phase `archived`, `archivedAt`, `archivedTo`); archive-path writes stay permitted.
+  Previously a stale Stop-handler fire silently rewound `archived` features to
+  `act`/`do`, corrupting the audit trail. Mutation-verified regression suite:
+  `test-scripts/regression/terminal-guard.test.js`.
+- **Dead-record binding sentinel (`lib/pdca/stop-binding.js`, `scripts/unified-stop.js`).**
+  A fire-time `lastSkillFeature` recording that names a feature absent from the
+  registry is proof the cycle completed (archive deletes the feature) — the Stop
+  binding now returns a null sentinel instead of falling through to
+  `primaryFeature`, killing the phantom next-phase re-fires behind the observed
+  9-consecutive-block loops. Shared `isDeadRecordedFeature` helper at both binding
+  sites; mutation-verified: `test-scripts/regression/dead-record-no-rebind.test.js`.
+- **Harness loop-breaker honored (both Stop handlers).** `stop_hook_active=true`
+  (set by Claude Code after a Stop hook blocks once) now always exits 0 —
+  previously both handlers ignored it and re-blocked. Verified in
+  `test-scripts/regression/stop-loop-breakers.test.js`.
+- **Terminal-feature emission silence (`scripts/pdca-skill-stop.js`).** Archiving
+  keeps the feature key in the registry with `phase: 'archived'`, so the dead-record
+  sentinel above did not fire — the stale transcript report envelope kept binding the
+  archived feature and re-emitting "PDCA-COMPLETE … Do NOT stop" on every later Stop.
+  A new early exit (placed after all binding tiers, same terminal predicate as the
+  write guard, plus `phase: 'completed'`) approves silently: exit 0, no output.
+  Mutation-verified regression suite:
+  `test-scripts/regression/terminal-complete-silence.test.js`
+  (archived / completed / live-feature control).
+- **Fire-time skill recording (`lib/orchestrator/skill-invocation-effects.js`,
+  `lib/pdca/stop-binding.js`).** `lastSkillAction`/`lastSkillFeature` are now written
+  when a PDCA skill FIRES (not scraped from Stop prose); the Stop binding's tier-0
+  prefers the fired feature over `primaryFeature`, and `unified-stop` spawns
+  stdin-CLI handlers correctly (a bare-require guard had made `require()` a silent
+  no-op). Gate writes read the live phase instead of a stale pre-handler snapshot.
+- **QA retry ceiling now reachable (`lib/pdca/state-machine.js`,
+  `scripts/qa-phase-stop.js`).** The `act → qa` QA_RETRY edge previously carried a
+  null guard, making the max-retry ceiling unreachable (observed retry counts > 180).
+  The guard is wired, an escalation banner names the missing metrics at retry 10 and
+  every 25th retry, and the sanctioned `scripts/pdca-record-qa.js` CLI records QA
+  results for sessions whose dispatch path is dead.
+- Resolved sessions also regain Skill-tool resolution of `bkit:pdca` (catalog and
+  resolver re-align at session start — the mid-session hot-update variant of this
+  break is a Claude Code host limitation, documented with evidence in the closed
+  report; the `pdca-record-qa` CLI remains the sanctioned recovery path).
+
+### Fixed — Stop-handler feature binding and report→completed transition
+
+- **The Stop handler no longer misbinds the feature.** The pure helper
+  `lib/pdca/stop-binding.js` (`resolveStopFeature`) adds a per-feature evidence tier
+  between doc-path matching and the `primaryFeature` fallback: when exactly one
+  registry feature sits in the phase matching the fired action, the Stop handler binds
+  that feature instead of silently advancing `primaryFeature`. Mutation-locked by
+  `test/unit/stop-binding.test.js`.
+- **report→completed no longer depends on the Task system.** The Stop handler
+  advances report→completed when the report-phase fire is observed AND the feature's
+  report doc exists on disk (same check the archive CLI makes). The archive gate's
+  docs-on-disk arm now accepts bug-fix doc sets — `analysis` moved to optional, so
+  cycles that skip Check can archive instead of stranding at E-ARCH-GATE forever.
+- **`updatePdcaStatus` no longer drops `data.timestamps`.** The timestamps rebuild
+  merges `data.timestamps` with `lastUpdated` kept last, so callers like
+  `archiveFeature` (`archivedAt`) land in the registry.
+- **`primaryFeature` no longer reverts to a stale feature.** The sanctioned promotion
+  fallback picked `activeFeatures[0]` (the OLDEST entry), so archiving the current
+  feature re-promoted a days-old one and re-poisoned every hook fallback binding.
+  `pickPrimarySuccessor(status)` (most recently active by `timestamps.lastUpdated`)
+  is now used at all 5 promotion sites; mutation-locked by
+  `test/unit/pdca-primary-successor.test.js`.
+- **Pre-existing (from upstream merge): destructive-detector targetFields grading was
+  dead.** `detect()`'s targetFields branch pushed `rule.severity` directly, never
+  consulting `severityFor` — every Bash-path match graded critical/deny regardless of
+  target scope. Fixed to grade by target like the segmented path (scoped find-delete
+  now asks instead of denying).
+- Docs refreshed for the new lib module count (201 → 202) in CUSTOMIZATION-GUIDE.md
+  and AI-NATIVE-DEVELOPMENT.md.
+
+### Fixed — ESLint flat-config coverage for test files and self-linting
+
+- **Jest globals declared for `test-scripts/`.** A new override block for
+  `test-scripts/**/*.test.js` (readonly `describe`/`it`/`test`/`expect`/
+  `beforeAll`/`afterAll`/`beforeEach`/`afterEach`/`jest`, inlined literal per the
+  config's import-free constraint) removes the 210 no-undef errors that appeared
+  when jest's `testMatch` moved to `test-scripts/`. `npx eslint test-scripts/`:
+  0 errors; full-repo error count 2303 → 2046 (remainder pre-existing
+  `no-console` violations, untouched).
+- **`eslint.config.js` can now lint itself.** The base block applied
+  `sourceType: "script"` to every `**/*.js` file — including the flat config's own
+  `export default`. A self-referential
+  `{ files: ["eslint.config.js"], languageOptions: { sourceType: "module" } }`
+  override fixes the parse error.
+
+### Fixed — session-start preflight disambiguation
+
+- The `fork-default-agent-spawn` advisory (lib/infra/cc-version-checker.js) and the
+  hook-reachability warning (hooks/session-start.js, via the pure
+  `buildReachabilityWarning` builder in lib/core/hook-reachability.js) now carry
+  explicit non-causality wording: the version advisory is NOT a hook failure; fresh
+  bash_post/write_post canary stamps mean hooks ARE firing; a stalled PDCA registry
+  while canaries are fresh points at skipped `/pdca <phase>` skill fires, not a hook
+  drop. Content locks:
+  `test/unit/preflight-hookdrop-disambiguation.test.js`.
+
+### Fixed — archive CLI now moves every phase-document variant
+
+- **`/pdca archive` no longer strands bilingual doc siblings.** The CLI's
+  `discoverDocs` collected one file per phase (`findDoc` returns the first
+  existing candidate), so a bilingual cycle — the project mandates en+ko
+  sibling pairs for new docs — archived one variant and left the other in the
+  source directory (observed twice; agents had to move the leftovers by
+  hand). A new `findAllDocs(phase, feature)` helper (lib/core/paths.js,
+  all readable candidates, deduped) backs a multi-variant collector; gate
+  semantics unchanged (a phase is missing only when no variant exists).
+  Mutation-verified regression suite:
+  `test-scripts/regression/archive-bilingual-pairs.test.js`
+  (bilingual / monolingual / gate cases).
+
+### Fixed — per-turn token measurement survives post-completion Stops
+
+- **The token ledger no longer stops growing after a cycle archives.** The
+  post-completion dead-record exit in `unified-stop` fired before the
+  per-turn observability block at the end of the handler, so once a session's
+  fire-time feature recording named an archived-out feature, every later Stop
+  silently skipped token-ledger and cc-regression recording. The recording
+  block is hoisted into `recordTurnObservability()` and runs on BOTH exit
+  paths. Caught by pre-running the CI contract suite locally against a live
+  registry (a fresh CI checkout never sees it); regression is covered by
+  `test/contract/integration-runtime.test.js` (23/23 with the dead-record
+  state live).
+
+### Fixed — CI aggregate gate: stale test contracts aligned with shipped behavior
+
+- The 403-file QA aggregate (contract-check CI) exposed three suites asserting
+  contracts their own change-waves had superseded — red since those waves
+  landed (their batteries ran only the jest suites), plus one stale doc count:
+  - destructive-detector.targetfields: G-001 now asserted per the v2.1.34 D9
+    contract (broad target denies, specific target asks) — both arms covered.
+  - pdca-archive-gate: `analysis` is an OPTIONAL phase document (bug-fix
+    cycles skip Check); `discoverDocs` missing-list asserted required-only.
+  - hook-behavioral-bash-pre: success-path stdout is opt-in
+    (`BKIT_VERBOSE_VALIDATION=1`); BPRE-05 made hermetic via a sandbox
+    `CLAUDE_PROJECT_DIR` (live session state leaked a "for sprint" clause
+    into the message when run under the aggregate).
+  - CUSTOMIZATION-GUIDE.md Scripts count corrected 64 → 65.
+- Full aggregate verified locally: 403 files, 7,155 PASS / 0 FAIL / 0 errors.
+
+### Chore
+
+- `.gitignore`: `bkit-debug.log` ignored.
+- Bug-report catalog housekeeping: closed reports moved to `bug_reports/completed/`
+  with `.completed` markers; stale INDEX entries removed (already-completed items
+  still listed as open; top-level INDEX carried dead links to reports that were
+  never in this repo).
+
+## [2.1.39] - 2026-09-19 (unreleased — version heading provisional; the maintainer assigns the release number)
+
+### Fixed — bugfix-wave-20260919 (six bug reports resolved via full PDCA cycle, matchRate 94%, QA_PASS)
+
+- **RB-003 — G-001/G-013 no longer fire on Write/Edit content.** Both rules now declare
+  `targetFields: ['command']` (the G-020 mechanism), so a Write whose *content* merely
+  mentions `rm -rf`, `rimraf`, or `shutil.rmtree` is no longer denied. Bash keeps full
+  coverage — the only surface that can actually execute a deletion. Both-sides regression
+  suite: `test/unit/destructive-detector.targetfields.test.js`.
+- **archive-phase-write — archive status write no longer silently gated out.**
+  `archiveFeature`'s archived-phase `updatePdcaStatus` call now passes `requireDocs:false`
+  (lib/pdca/lifecycle.js) — an archived feature has by definition left its docs' source
+  location, so the doc gate can no longer swallow the write.
+- **BR-001 — sanctioned orphan-row cleanup.** `deleteFeatureFromStatus` now removes
+  non-terminal active rows whose plan/design docs are provably absent
+  (`reason: 'orphan-removed (docs missing)'`), recovering the 3-feature
+  `canStartFeature` cap without hand-editing the registry. Live features with docs
+  remain protected: `test/unit/status-cleanup-orphan.test.js`.
+- **RB-002 + BR-002 — matchRate recording repaired.** `gap-detector-stop.js` now
+  reorders the regex (`Overall Match Rate` first, table form `Overall Match Rate | 98%`
+  handled), passes the regex-extracted feature name into `extractFeatureFromContext`
+  (the old call passed keys the function ignores, guaranteeing the primaryFeature
+  fallback), and adds a wrong-feature guard (unknown feature → parseWarning, nothing
+  recorded). Suite: `test/unit/gap-detector-stop-parsing.test.js`.
+- **RB-002 — archive gate accepts docs-on-disk evidence.** `pdca-archive.js` now passes
+  when phase is report..completed AND all 4 documents exist at canonical paths
+  (`gate: 'docs-on-disk'` in the payload) — registry bookkeeping drift no longer
+  permanently blocks archiving a genuinely complete cycle. Fail-closed preserved for
+  earlier phases. Suite: `test/unit/pdca-archive-gate.test.js`.
+- **stop-failure-payload — Stop failure entries carry real fields.** `parseFailurePayload`
+  (scripts/stop-failure-handler.js) extracts plain-string `error`, `last_assistant_message`
+  (string and content[0].text forms), derives errorType from the classifier when absent,
+  and adds an `exit_code` category — failures no longer collapse to unknown/low/empty.
+  Suite: `test/unit/stop-failure-payload.test.js`.
+
+### Added
+
+- 5 regression suites / 48 test cases covering the fixes above; full unit battery green
+  (1979/1980 executed, 0 fail). Bug reports `rb003`, `rb002`, `archive-phase-write`,
+  `br001`, `br002` moved to `bug_reports/completed/` with `.completed` markers; new
+  open reports filed during the wave: `br003` (updatePdcaStatus drops data.timestamps),
+  `br004` (CHANGELOG provisional heading vs plugin.json version-sync integration test —
+  pre-existing, maintainer action).
+
+## [2.1.39] - 2026-09-07 (unreleased — version heading provisional; the maintainer assigns the release number)
+
+### Fixed — the PDCA registry never advanced on a skill fire
+
+Field evidence (`work/pdca-skill-fire-test-results.md`): three real `/pdca` fires were
+detected by the hook layer (registry timestamp advanced, guidance emitted) while the
+feature was never registered and no phase changed. Root cause:
+`runSkillInvocationEffects` gated the phase write on the skill's *static* frontmatter
+`pdca-phase`, which the `pdca` router declares `null` by design — the effective phase
+arrives as the invocation's action token, which #135 wired into guidance but never into
+the write path. Router fires now resolve the phase from the action (direct names plus
+`analyze→check`, `iterate→act` aliases, reusing the `PDCA_ACTION_PHASES` SSoT) and pass
+`requireDocs:false` — a new feature's documents are the phase's *output* and cannot
+exist at fire time. Read-like actions (`status`, `next`) still write nothing.
+
+### Added — the registry is broker-only, portably
+
+- **G-020 (Registry state write, critical/deny)** denies agent Write/Edit operations
+  targeting `.bkit/state/*.json`, porting the machine-local Python pdca-guard's
+  PRE-EXEC semantics into bkit's own detector. A new `targetFields` rule property
+  scopes it to the tool's TARGET — a state-path mention in payload prose is not a
+  write. Documentation files (`.md`/`.txt`, any `docs/` path) are exempt *before* any
+  state-token matching, closing the reported false-positive class where a design doc
+  demonstrating a state-path command was denied for its content.
+- **G-019 redirect-form fix**: both alternations' bare `>>?` now require
+  `(?<![0-9&])` — stderr/descriptor redirects (`2>`, `&>`) are not the stdout-write
+  token, so read-only commands like `grep … 2>/dev/null` near a state path pass again
+  (live-measured false positive). Narrowing only; plain and append redirects still deny.
+- **`scripts/pdca-archive.js`** — the sanctioned archive path: dry-run by default,
+  `--apply` to mutate, completion gate evaluated before any filesystem change,
+  registry write ordered before document moves (the issue #89 `requireDocs` gate
+  would otherwise silently skip the archived transition), `--summary` for metrics
+  preservation. `lifecycle.archiveFeature` — previously wired to nothing — is its
+  registry writer.
+- **Deny guidance names the sanctioned paths**: `alternativesFor()` G-019/G-020
+  entries and the Write-path block message direct to `/pdca <phase> <feature>`, the
+  archive CLI, and the `bkit_pdca_status` MCP tool instead of generic "ask the user".
+- **The pdca skill's steps are brokered-registry-true**: every
+  "Update `.bkit/state/pdca-status.json`" step is now verify-only (fire-time writes,
+  gap-detector Stop hook for matchRate, TaskCompleted for `completed`, the CLI for
+  archive), `/pdca status` reads MCP-first with the lib API as fallback, and template
+  references disclose their resolved location (`${CLAUDE_PLUGIN_ROOT}/templates/`) so
+  agents stop searching the project root for them.
+
+### Fixed — the Write-path detector verdict was advisory only
+
+The gap analysis's Critical finding, live-confirmed by probe: `pre-write.js` Stage 6
+pushed destructive detections into `contextParts` and emitted them via `outputAllow` —
+the engine correctly detected G-020 on a registry Write while the write proceeded, and
+the audit trail recorded `destructive_blocked` / `result: 'blocked'` for writes that
+actually executed (the ENH-388 false-assurance class). Deny-action detections now
+return the ENH-398 verdict object and the hook blocks; `blocked` is reserved for real
+blocks, advisory detections log `destructive_detected` / `advisory`. A new L2
+synthetic-stdin hook suite pins the behavior end-to-end (registry Write blocked with
+sanctioned-path guidance; `.md` doc with state-path prose allowed; Bash parity).
+
+Verified across the cycle: gap analysis 73.5% → 95.0% after one Act iteration; QA_PASS
+(L1 31/31, L2 4/4, L3 11/11, L5 40/40, hook cost ~76–78 ms median = 1.7% of the 5 s
+budget); full battery 5,355 TC, 0 FAIL. The feature's own cycle advanced plan →
+archived through the new mechanism with zero manual registry writes, and archived
+itself with its own CLI.
+
 ## [2.1.40] - 2026-09-25
 
 ### Added — plan, QA and security methods adapted from gstack

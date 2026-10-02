@@ -15,12 +15,64 @@
  */
 
 
+// ============================================================
+// Pure helpers (bugfix-wave-20260919 §3 Fix 4) — factored out of the
+// main flow so unit tests can require them without executing the hook.
+// Design Ref: §3 Fix 4a/4b
+// ============================================================
+
+// Fix 4a: 'Overall' bare alternative used to win first, so 'Overall Match
+// Rate: 98%' matched via the fragile Overall branch. Put the full phrase
+// first and exclude '%' from the filler run so table form can't overrun.
+const matchRatePattern = /(Overall\s+Match Rate|Match Rate|매치율|일치율|Design Match)[^0-9%]*(\d+)/i;
+
+/**
+ * Parse the match rate from gap-detector output text.
+ * @param {string} text
+ * @returns {number|null} integer percent, or null when unmeasured
+ */
+function parseMatchRate(text) {
+  const m = (text || '').match(matchRatePattern);
+  return m ? parseInt(m[2], 10) : null;
+}
+
+// Fix 4b (BR-002): the agent's own text, not status.primaryFeature, is the
+// authoritative source for which feature this analysis is about.
+const featurePattern = /feature[:\s]+['"]?([a-z0-9][a-z0-9-]*)['"]?/i;
+const analysisPattern = /analyzing\s+['"]?([a-z0-9][a-z0-9-]*)['"]?/i;
+
+/**
+ * Extract the feature name the gap-detector reported.
+ * @param {string} text
+ * @returns {string|null} kebab-case feature name, or null
+ */
+function extractFeatureFromText(text) {
+  const t = text || '';
+  const m = t.match(featurePattern) || t.match(analysisPattern);
+  return m ? m[1] : null;
+}
+
+/**
+ * Fix 4c: wrong-feature guard — a resolved feature is recordable only if it
+ * already exists in the PDCA status (primaryFeature or activeFeatures).
+ * @param {string|null} feature
+ * @param {{ primaryFeature?: string|null, activeFeatures?: string[] }} status
+ * @returns {boolean}
+ */
+function isKnownFeature(feature, status) {
+  if (!feature || !status) return false;
+  return feature === status.primaryFeature ||
+    (Array.isArray(status.activeFeatures) && status.activeFeatures.includes(feature));
+}
+
 // v2.1.12 Sprint C-2 (#9/#10/#8): bare-require guard — when this script
-// is require()-d instead of executed as a hook entrypoint, return
-// immediately so no stale stdout (decisions, advisory messages) is emitted
+// is require()-d instead of executed as a hook entrypoint, export only the
+// pure helpers so no stale stdout (decisions, advisory messages) is emitted
 // without a real hook payload. CommonJS module body is implicitly an IIFE,
 // so top-level return is valid.
-if (require.main !== module) { module.exports = {}; return; }
+if (require.main !== module) {
+  module.exports = { parseMatchRate, extractFeatureFromText, isKnownFeature, matchRatePattern };
+} else {
 
 const { readStdinSync, readHookText, outputStopSurface } = require('../lib/core/io');
 const { debugLog } = require('../lib/core/debug');
@@ -65,8 +117,7 @@ debugLog('Agent:gap-detector:Stop', 'Input received', {
 
 // Try to extract match rate from the agent's output
 // Patterns: "Overall Match Rate: XX%", "매치율: XX%", "Match Rate: XX%", "일치율: XX%"
-const matchRatePattern = /(Overall|Match Rate|매치율|일치율|Design Match)[^0-9]*(\d+)/i;
-const match = inputText.match(matchRatePattern);
+const matchRate = parseMatchRate(inputText);
 /*
  * v2.1.34 — a gap analysis that stated no rate is UNMEASURED, not 0%.
  *
@@ -82,24 +133,40 @@ const match = inputText.match(matchRatePattern);
  * nothing matching, and starts fixing code against a measurement that was never
  * taken.
  */
-const matchRate = match ? parseInt(match[2], 10) : null;
 const measured = matchRate !== null;
 
-// Extract feature name from multiple sources
-const featurePattern = /feature[:\s]+['"]?(\w[\w-]*)['"]?/i;
-const analysisPattern = /analyzing\s+['"]?(\w[\w-]*)['"]?/i;
-const featureMatch = inputText.match(featurePattern) || inputText.match(analysisPattern);
+// Extract feature name from the agent's own text first (Fix 4b); fall back to
+// the previous context-resolution path only when the text names nothing.
+const featureFromText = extractFeatureFromText(inputText);
 const currentStatus = getPdcaStatusFull();
 
-const feature = extractFeatureFromContext({
-  agentOutput: inputText,
-  currentStatus
-});
+// Design Ref: §3 Fix 4b/4c — extractFeatureFromContext ignores agentOutput
+// (it only reads sources.feature/filePath), so pass the regex-extracted name
+// explicitly; then guard against attributing the rate to an unknown feature.
+let feature;
+let parseStatus = 'ok';
+let parseWarning = null;
+if (featureFromText) {
+  feature = extractFeatureFromContext({ feature: featureFromText, filePath: undefined });
+  if (!isKnownFeature(feature, currentStatus)) {
+    parseStatus = 'partial';
+    parseWarning = `Reported feature '${featureFromText}' not found in PDCA status (primaryFeature: ${currentStatus?.primaryFeature || 'none'}); match rate not recorded`;
+    feature = null;
+  }
+} else {
+  feature = extractFeatureFromContext({ feature: undefined, filePath: undefined });
+  if (!feature) {
+    parseStatus = 'partial';
+    parseWarning = 'No feature name found in output and no primaryFeature in status';
+  }
+}
 
 debugLog('Agent:gap-detector:Stop', 'Data extracted', {
   matchRate,
   feature: feature || 'unknown',
-  hadFeatureInOutput: !!featureMatch
+  hadFeatureInOutput: !!featureFromText,
+  parseStatus,
+  parseWarning,
 });
 
 // v1.4.0 P2: Calculate requirement fulfillment if plan exists
@@ -649,13 +716,13 @@ try {
   } else {
     sm.transition('check', 'ITERATE', { ...smCtx, matchRate });
   }
-} catch (_) {}
+} catch { /* non-critical */ }
 
 // v2.0.0: Metrics collection
 try {
   const mc = require('../lib/quality/metrics-collector');
   if (measured) mc.collectMetric('M1', feature || 'unknown', matchRate, 'gap-detector');
-} catch (_) {}
+} catch { /* non-critical */ }
 
 // v2.0.0: Audit logging
 try {
@@ -672,7 +739,8 @@ try {
     details: { matchRate, threshold, measured },
     result: !measured ? 'blocked' : (matchRate >= threshold ? 'success' : 'failure')
   });
-} catch (_) {}
+} catch { /* non-critical */ }
 
 outputStopSurface(reason);
 process.exit(0);
+}

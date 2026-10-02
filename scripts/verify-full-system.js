@@ -234,7 +234,10 @@ check('J_hooks_json_integrity', () => {
 // ── K: Sprint state machine integrity ──────────────────────────────
 check('K_sprint_state_machine', () => {
   const file = path.join(ROOT, '.bkit/state/sprints/v2114-differentiation-release.json');
-  if (!fs.existsSync(file)) throw new Error('v2114 sprint state missing');
+  // Untracked runtime state: clones without it skip the check instead of failing.
+  if (!fs.existsSync(file)) {
+    return { skipped: true, reason: 'v2114 sprint state not present in this clone (untracked runtime state)' };
+  }
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
   const subSprints = data.subSprints || [];
   const expected = ['coordination', 'defense', 'a-observability', 'e-defense', 'doc', 'observation'];
@@ -261,6 +264,7 @@ function isCategoryOk(v) {
 }
 
 function categoryDetail(v) {
+  if (v.skipped) return `SKIP — ${v.reason || 'no reason given'}`;
   if (v.error) return v.error;
   if (Array.isArray(v.servers)) {
     return v.servers.map((s) => `${s.server}:${s.ok ? 'ok' : 'fail'}` + (s.handshakeMs ? ` (${s.handshakeMs.toFixed(1)}ms)` : '')).join(' ');
