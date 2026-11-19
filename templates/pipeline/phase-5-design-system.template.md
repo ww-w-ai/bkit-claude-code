@@ -104,9 +104,9 @@
 
 ```bash
 # shadcn/ui component installation log
-npx shadcn@latest add button
-npx shadcn@latest add input
-npx shadcn@latest add card
+npx shadcn@4.23.0 add button
+npx shadcn@4.23.0 add input
+npx shadcn@4.23.0 add card
 # ...
 ```
 

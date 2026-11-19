@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security — the shadcn CLI is pinned instead of resolved at `@latest` (#166)
+
+The phase-5 design-system skill and its template ran `npx shadcn@latest init`
+and `npx shadcn@latest add ...`. Both commands write config and component
+source into the user's repository, so a floating version let every new shadcn
+release run automatically in the user's project and could change the generated
+output the rest of the skill assumes.
+
+- **Pinned to `shadcn@4.23.0`** in `skills/phase-5-design-system/SKILL.md`
+  (`init` and the three `add` commands) and in
+  `templates/pipeline/phase-5-design-system.template.md`. The skill states the
+  pinned version once and says to change every pinned command together when
+  upgrading.
+- Reported by @Dimooyoyo.
+
 ## [2.1.41] - 2026-10-31
 
 ### Fixed — PDCA state has one writer, and a phase moves only on a measurement (#164)
