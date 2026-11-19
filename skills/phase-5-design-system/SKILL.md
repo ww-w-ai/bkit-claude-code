@@ -119,14 +119,16 @@ docs/02-design/
 
 ## shadcn/ui Installation
 
+The shadcn CLI is pinned to `4.23.0` in every command below. `init` and `add` write config and component source into your repository, so the version must not float. To upgrade, change all pinned commands together.
+
 ```bash
 # Initial setup
-npx shadcn@latest init
+npx shadcn@4.23.0 init
 
 # Add components
-npx shadcn@latest add button
-npx shadcn@latest add input
-npx shadcn@latest add card
+npx shadcn@4.23.0 add button
+npx shadcn@4.23.0 add input
+npx shadcn@4.23.0 add card
 ```
 
 ## Required Component List
